@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInView } from '../hooks/useInView';
+import { getDeployment } from '@wraith-protocol/sdk/chains/stellar';
 
 /**
  * Cache strategy:
@@ -27,8 +28,8 @@ type CacheEntry = {
   expiry: number;
 };
 
-const rpcUrl = 'https://soroban-testnet.stellar.org';
-const contractId = 'CCJLJ2QRBJAAKIG6ELNQVXLLWMKKWVN5O2FKWUETHZGMPAD4MHK7WVWL';
+const { sorobanUrl: rpcUrl, contracts } = getDeployment('stellar');
+const contractId = contracts.announcer;
 
 async function getLatestLedger(): Promise<number> {
   const res = await fetch(rpcUrl, {

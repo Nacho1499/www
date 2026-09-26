@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { describe, expect, it } from 'vitest';
 import App from '../App';
+import { getDeployment } from '@wraith-protocol/sdk/chains/stellar';
 
 describe('Stellar page and partners section', () => {
   it('renders the Stellar page for the /stellar route', async () => {
@@ -40,6 +41,25 @@ describe('Stellar page and partners section', () => {
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     });
+  });
+
+  it('renders canonical Stellar deployment addresses with explorer links', async () => {
+    window.history.replaceState({}, '', '/stellar');
+
+    render(<App />);
+
+    const deployment = getDeployment('stellar');
+    expect(await screen.findByText(deployment.contracts.announcer)).toBeInTheDocument();
+    expect(screen.getByText(deployment.contracts.names)).toBeInTheDocument();
+    expect(screen.queryByText(/placeholder/i)).not.toBeInTheDocument();
+
+    const explorerLinks = screen.getAllByRole('link', { name: /view/i });
+    expect(explorerLinks).toHaveLength(2);
+    for (const link of explorerLinks) {
+      expect(link.getAttribute('href')).toMatch(
+        /^https:\/\/stellar\.expert\/explorer\/testnet\/contract\/[A-Z0-9]{56}$/,
+      );
+    }
   });
 
   it('has no axe violations on the Stellar page', async () => {

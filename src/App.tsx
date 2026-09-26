@@ -33,6 +33,7 @@ const Grants = lazy(() => import('./pages/Grants'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 const Careers = lazy(() => import('./pages/Careers'));
 const About = lazy(() => import('./pages/About'));
+const Governance = lazy(() => import('./pages/Governance'));
 const Vitals = lazy(() => import('./pages/Vitals'));
 const Security = lazy(() => import('./pages/Security'));
 const ThreatModel = lazy(() => import('./pages/ThreatModel'));
@@ -40,6 +41,8 @@ const Status = lazy(() => import('./pages/Status'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Contributors = lazy(() => import('./pages/Contributors'));
 const Blog = lazy(() => import('./pages/Blog'));
+const Ecosystem = lazy(() => import('./pages/Ecosystem'));
+const ChainsPage = lazy(() => import('./pages/Chains'));
 
 function Home() {
   return (
@@ -88,6 +91,14 @@ export default function App() {
             <Route path="/roadmap" element={<Roadmap />} />
             <Route path="/case-studies" element={<CaseStudies />} />
             <Route path="/case-studies/:slug" element={<CaseStudies />} />
+            <Route
+              path="/ecosystem"
+              element={
+                <Layout>
+                  <Ecosystem />
+                </Layout>
+              }
+            />
             <Route path="/vitals" element={<Vitals />} />
             <Route
               path="/security"
@@ -148,6 +159,14 @@ export default function App() {
               }
             />
             <Route
+              path="/governance"
+              element={
+                <Layout>
+                  <Governance />
+                </Layout>
+              }
+            />
+            <Route
               path="/contributors"
               element={
                 <Layout>
@@ -184,6 +203,14 @@ export default function App() {
               element={
                 <Layout>
                   <Blog />
+                </Layout>
+              }
+            />
+            <Route
+              path="/chains"
+              element={
+                <Layout>
+                  <ChainsPage />
                 </Layout>
               }
             />
