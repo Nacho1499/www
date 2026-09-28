@@ -20,7 +20,7 @@ function createRequest({
       ...headers,
     },
     body,
-  } as never;
+  };
 }
 
 function createResponse() {
@@ -35,14 +35,17 @@ function createResponse() {
     end(payload: string) {
       this.payload = payload;
     },
-  } as never;
+  };
 }
 
 async function invoke(request = createRequest()) {
   const { default: handler } = await import('../../api/subscribe');
   const response = createResponse();
-  await handler(request, response);
-  return response as unknown as ReturnType<typeof createResponse>;
+  await handler(
+    request as unknown as Parameters<typeof handler>[0],
+    response as unknown as Parameters<typeof handler>[1],
+  );
+  return response;
 }
 
 describe('POST /api/subscribe', () => {
@@ -110,7 +113,7 @@ describe('POST /api/subscribe', () => {
     const call = vi.mocked(fetch).mock.calls[0];
 
     expect(response.statusCode).toBe(201);
-    expect(JSON.parse(String(call[1]?.body))).toEqual({
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
       email: 'reader@example.com',
       tags: ['newsletter'],
       type: 'unconfirmed',

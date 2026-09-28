@@ -90,7 +90,7 @@ function getClientKey(req: SubscribeRequest): string {
   const forwardedFor = req.headers['x-forwarded-for'];
   const ip =
     (typeof realIp === 'string' && realIp) ||
-    (typeof forwardedFor === 'string' && forwardedFor.split(',')[0].trim()) ||
+    (typeof forwardedFor === 'string' && forwardedFor.split(',')[0]?.trim()) ||
     'unknown';
   return createHash('sha256').update(ip).digest('hex');
 }
