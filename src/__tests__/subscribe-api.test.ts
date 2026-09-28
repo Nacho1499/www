@@ -3,16 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const API_KEY = 'test-buttondown-key';
 
 function createRequest({
+  method = 'POST',
   body = { email: 'reader@example.com' },
   ip = '192.0.2.1',
   headers = {},
 }: {
+  method?: string;
   body?: unknown;
   ip?: string;
   headers?: Record<string, string>;
 } = {}) {
   return {
-    method: 'POST',
+    method,
     headers: {
       'content-type': 'application/json',
       'x-real-ip': ip,
@@ -56,8 +58,15 @@ describe('POST /api/subscribe', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it('includes a request id on every response', async () => {
+    const response = await invoke(createRequest({ method: 'GET' }));
+
+    expect(response.headers['X-Request-Id']).toBeTruthy();
   });
 
   it('rejects malformed and oversized JSON without contacting Buttondown', async () => {
@@ -126,5 +135,26 @@ describe('POST /api/subscribe', () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.payload).toBe(JSON.stringify({ ok: true }));
+  });
+
+  it('aborts a slow provider request and returns a timeout response', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string | URL | Request, options?: RequestInit) =>
+          new Promise((_, reject) => {
+            options?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      ),
+    );
+
+    const { UPSTREAM_TIMEOUT_MS } = await import('../../api/subscribe');
+    const responsePromise = invoke();
+    await vi.advanceTimersByTimeAsync(UPSTREAM_TIMEOUT_MS);
+    const response = await responsePromise;
+
+    expect(response.statusCode).toBe(504);
+    expect(JSON.parse(response.payload)).toMatchObject({ code: 'upstream_timeout' });
   });
 });
