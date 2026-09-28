@@ -31,7 +31,14 @@ type SubscribeErrorCode =
   | 'upstream_timeout'
   | 'upstream_error';
 
-const BUTTONDOWN_API_URL = 'https://api.buttondown.email/v1/subscribers';
+export const BUTTONDOWN_API_URL = 'https://api.buttondown.email/v1/subscribers';
+
+/**
+ * Bounded upstream timeout. A slow provider must never hold the function open
+ * indefinitely, so every request is aborted after this window.
+ */
+export const UPSTREAM_TIMEOUT_MS = 5000;
+
 // Simple email regex — we validate server-side to avoid trusting the client.
 const EMAIL_RE = /^[^\s@]+@[^\s@][^@]*\.[^\s@]+$/;
 const MAX_BODY_BYTES = 1024;
