@@ -218,16 +218,14 @@ export default function Stellar() {
   return (
     <>
       <Helmet>
-        <title>Stealth payments on Stellar – Wraith Protocol</title>
-        <meta
-          name="description"
-          content="Low-cost, sub-second, ed25519 stealth payments on Stellar with Soroban smart contracts. Build private payment rails with the Wraith SDK."
-        />
-        <meta property="og:title" content="Stealth payments on Stellar – Wraith Protocol" />
-        <meta
-          property="og:description"
-          content="Low-cost, sub-second, ed25519 stealth payments on Stellar with Soroban smart contracts."
-        />
+        <title>{seo.title}</title>
+        <meta name="description" content={seo.description} />
+        <link rel="canonical" href={seo.canonical} />
+        {seo.alternates.map((alt) => (
+          <link key={alt.hrefLang} rel="alternate" hrefLang={alt.hrefLang} href={alt.href} />
+        ))}
+        <meta property="og:title" content={seo.title} />
+        <meta property="og:description" content={seo.description} />
         <meta property="og:image" content="https://usewraith.xyz/og/stellar.png" />
         <meta property="og:url" content={seo.canonical} />
         <meta property="og:type" content="website" />

@@ -63,7 +63,9 @@ describe('serializeJsonLd - script-breaking sequences', () => {
   });
 
   it('emits the escape sequences instead of stripping the content', () => {
-    const out = serializeJsonLd(hostileArticle('</script>'));
+    // Input must contain every character the serializer escapes (<, >, &)
+    // so each expected escape sequence is actually exercised.
+    const out = serializeJsonLd(hostileArticle('</script>&'));
 
     for (const escape of EXPECTED_ESCAPES) {
       expect(out).toContain(escape);

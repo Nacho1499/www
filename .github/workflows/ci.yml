@@ -7,6 +7,22 @@ on:
     branches: [main, develop]
 
 jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The serverless smoke tests serve the built `dist/` output, so the full
+      # suite only runs against a fresh build.
+      - run: pnpm build
+      - run: pnpm test
+
   build:
     runs-on: ubuntu-latest
     steps:

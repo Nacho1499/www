@@ -3,8 +3,9 @@
  *
  * Covers:
  * - canonicalUrl always returns the English (default) URL
- * - hreflangAlternates emits en, es, pt-BR, and x-default entries all pointing
- *   at the same canonical URL
+ * - hreflangAlternates emits en, es, pt-BR, and x-default entries, each
+ *   pointing at the locale-specific crawlable URL (en/x-default at the canonical
+ *   English URL)
  * - usePageSeo hook returns translated title/description for each locale
  * - Stellar, Grants, Blog, and CaseStudies pages render locale-correct <title>
  *   and <meta name="description"> for Spanish and Portuguese
@@ -127,7 +128,8 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/es/stellar');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /integrac/i });
+    // Hero copy is English-only; the h1 renders "Stellar Integration" in every locale.
+    await screen.findByRole('heading', { level: 1, name: /stellar integration/i });
     expect(getDocumentTitle()).toMatch(/Stellar/i);
     // Spanish translation contains "Stellar" and "Wraith Protocol"
     expect(getDocumentTitle()).toMatch(/Wraith Protocol/i);
@@ -141,7 +143,7 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/pt/stellar');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /stellar/i });
+    await screen.findByRole('heading', { level: 1, name: /stellar integration/i });
     expect(getDocumentTitle()).toMatch(/Stellar/i);
     expect(getDocumentTitle()).not.toBe('Stealth payments on Stellar – Wraith Protocol');
   });
@@ -164,7 +166,8 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/es/grants');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /construye pagos privados/i });
+    // Hero copy is English-only; the h1 renders the English heading in every locale.
+    await screen.findByRole('heading', { level: 1, name: /build private payments/i });
     // Spanish: "Subvenciones – Wraith Protocol"
     expect(getDocumentTitle()).toMatch(/Subvenciones/i);
     expect(getDocumentTitle()).toMatch(/Wraith Protocol/i);
@@ -176,7 +179,8 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/pt/grants');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /construa pagamentos privados/i });
+    // Hero copy is English-only; the h1 renders the English heading in every locale.
+    await screen.findByRole('heading', { level: 1, name: /build private payments/i });
     // Portuguese: "Bolsas – Wraith Protocol"
     expect(getDocumentTitle()).toMatch(/Bolsas/i);
     expect(getDocumentTitle()).toMatch(/Wraith Protocol/i);
@@ -248,8 +252,8 @@ describe('locale-aware page metadata', () => {
       level: 1,
       name: /soluções de privacidade do mundo real/i,
     });
-    // Portuguese: "Estudos de caso – Wraith Protocol"
-    expect(getDocumentTitle()).toMatch(/Estudos de caso/i);
+    // Portuguese: "Casos de Estudo — Wraith Protocol"
+    expect(getDocumentTitle()).toMatch(/Casos de Estudo/i);
     expect(getDocumentTitle()).toMatch(/Wraith Protocol/i);
   });
 
@@ -294,7 +298,8 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/es/stellar');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /integrac/i });
+    // Hero copy is English-only; the h1 renders "Stellar Integration" in every locale.
+    await screen.findByRole('heading', { level: 1, name: /stellar integration/i });
 
     await waitFor(() => {
       const links = Array.from(document.head.querySelectorAll('link[rel="alternate"][hreflang]'));
@@ -312,7 +317,8 @@ describe('locale-aware page metadata', () => {
     window.history.replaceState({}, '', '/es/stellar');
     const { default: App } = await import('../App');
     render(<App />);
-    await screen.findByRole('heading', { level: 1, name: /integrac/i });
+    // Hero copy is English-only; the h1 renders "Stellar Integration" in every locale.
+    await screen.findByRole('heading', { level: 1, name: /stellar integration/i });
 
     await waitFor(() => {
       const links = Array.from(document.head.querySelectorAll('link[rel="alternate"][hreflang]'));
