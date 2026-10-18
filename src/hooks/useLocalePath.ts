@@ -14,43 +14,14 @@
 
 import { useTranslation } from 'react-i18next';
 import { type Locale } from '../i18n';
+import { hasLocalizedRoute } from '../utils/localizedRoutes';
 
 const LOCALE_PREFIX: Partial<Record<Locale, string>> = {
   es: '/es',
   pt: '/pt',
 };
 
-// Routes that have localized versions (exist under /es/* and /pt/*)
-// Base paths that support localization
-const LOCALIZED_BASE_PATHS = new Set<string>([
-  '/',
-  '/stellar',
-  '/grants',
-  '/blog',
-  '/case-studies',
-]);
-
-/**
- * Checks if a given path has a localized version.
- * Only routes defined in the locale-prefixed routes in App.tsx should return true.
- * This includes base paths and their sub-routes (e.g., /blog, /blog/:slug, /blog/author/:id).
- */
-export function hasLocalizedRoute(path: string): boolean {
-  if (!path.startsWith('/')) return false;
-  if (path === '/') return true;
-
-  const segments = path.split('/').filter(Boolean);
-  if (segments.length === 0) return false;
-
-  const basePath = `/${segments[0]}`;
-
-  // Check if the base path is in the localized routes
-  if (LOCALIZED_BASE_PATHS.has(basePath)) {
-    return true;
-  }
-
-  return false;
-}
+export { hasLocalizedRoute } from '../utils/localizedRoutes';
 
 export function useLocalePath(): (path: string) => string {
   const { i18n } = useTranslation();

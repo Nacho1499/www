@@ -15,6 +15,8 @@
     "test:e2e": "playwright test",
     "test:a11y": "vitest run src/__tests__/a11y.test.tsx",
     "test:a11y:playwright": "playwright test tests/a11y",
+    "test:link-check": "vitest run tests/link-check",
+    "check:links": "tsx scripts/check-links.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:i18n": "node scripts/lint-i18n.mjs",

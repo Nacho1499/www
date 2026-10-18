@@ -10,6 +10,7 @@ import PartnerStrip from './components/PartnerStrip';
 import { ThemeProvider } from './context/ThemeContext';
 import { usePageSeo } from './utils/seo';
 import { changeLocale, type Locale } from './i18n';
+import { useScrollToHash } from './hooks/useScrollToHash';
 
 // Lazy load below-the-fold homepage components
 const StealthAnimation = lazy(() => import('./components/StealthAnimation'));
@@ -27,6 +28,8 @@ const Footer = lazy(() => import('./components/Footer'));
 // Lazy load pages
 const Faq = lazy(() => import('./pages/Faq'));
 const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Press = lazy(() => import('./pages/Press'));
 const Newsletter = lazy(() => import('./pages/Newsletter'));
 const UseCases = lazy(() => import('./pages/UseCases'));
 const CostCalculatorPage = lazy(() => import('./pages/CostCalculatorPage'));
@@ -78,6 +81,7 @@ function LocaleSync() {
 
 function Home() {
   const seo = usePageSeo('home');
+  useScrollToHash();
 
   return (
     <div className="bg-surface text-on-surface">
@@ -131,6 +135,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/faq" element={<Faq />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/press" element={<Press />} />
             <Route path="/newsletter" element={<Newsletter />} />
             <Route path="/use-cases" element={<UseCases />} />
             <Route path="/use-cases/calculator" element={<CostCalculatorPage />} />

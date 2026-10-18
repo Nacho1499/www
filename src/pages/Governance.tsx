@@ -2,13 +2,17 @@ import teamData from '../data/team.json';
 import optOutData from '../data/contributors-optout.json';
 import { Link } from 'react-router-dom';
 
+type TeamMember = (typeof teamData.team)[number] & { github?: string };
+
+const team: TeamMember[] = teamData.team;
+
 export default function Governance() {
   const maintainerRoles = [
     'Founder & Protocol Architect',
     'Lead Engineer',
     'Cryptography Engineer',
   ];
-  const maintainers = teamData.team.filter(
+  const maintainers = team.filter(
     (member) =>
       maintainerRoles.includes(member.role) &&
       (!member.github || !optOutData.includes(member.github.replace('https://github.com/', ''))),

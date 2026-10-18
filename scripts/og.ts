@@ -5,6 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import React from 'react';
 import { listOgImageJobs, type OgImageJob } from '../src/utils/og-metadata';
+import { hasLocalizedRoute } from '../src/utils/localizedRoutes';
 
 const h = React.createElement;
 
@@ -199,16 +200,27 @@ function patchMetadata(html: string, config: OgImageJob): string {
   const esUrl = `${SITE_URL}/es${cleanPath}`;
   const ptUrl = `${SITE_URL}/pt${cleanPath}`;
 
+  // Only routes registered under /es and /pt get locale alternates.
+  const localized = hasLocalizedRoute(config.routePath);
   const hreflangLinks = [
     `<link rel="canonical" href="${enUrl}" />`,
-    `<link rel="alternate" hreflang="en" href="${enUrl}" />`,
-    `<link rel="alternate" hreflang="es" href="${esUrl}" />`,
-    `<link rel="alternate" hreflang="pt-BR" href="${ptUrl}" />`,
-    `<link rel="alternate" hreflang="x-default" href="${enUrl}" />`,
+    ...(localized
+      ? [
+          `<link rel="alternate" hreflang="en" href="${enUrl}" />`,
+          `<link rel="alternate" hreflang="es" href="${esUrl}" />`,
+          `<link rel="alternate" hreflang="pt-BR" href="${ptUrl}" />`,
+          `<link rel="alternate" hreflang="x-default" href="${enUrl}" />`,
+        ]
+      : []),
   ].join('\n    ');
 
-  // Inject before </head>
-  patched = patched.replace('</head>', `    ${hreflangLinks}\n  </head>`);
+  // dist/index.html is also the SPA fallback for every route without its own
+  // file. React 19 hoists each page's Helmet tags without removing static ones,
+  // so a canonical in that shell would sit next to the page's own canonical on
+  // every fallback route. The homepage gets its canonical from Helmet instead.
+  if (config.routePath !== '/') {
+    patched = patched.replace('</head>', `    ${hreflangLinks}\n  </head>`);
+  }
 
   // Breadcrumb JSON-LD
   const breadcrumbListElement: any[] = [
