@@ -33,6 +33,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Fail on high production dependency advisories
+        run: pnpm audit --prod --audit-level=high
       - run: pnpm format:check
       - run: pnpm lint:i18n
       - run: pnpm validate:content
