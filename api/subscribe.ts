@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { SUBSCRIBE_API_SECURITY_HEADERS } from '../src/utils/security-headers';
 
 /**
  * Vercel serverless function — not part of the Vite/tsc build (only `src` is
@@ -107,8 +108,10 @@ function logEvent(requestId: string, event: string, status: number) {
 
 function sendJson(res: ServerResponse, requestId: string, status: number, payload: unknown) {
   res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store');
+  for (const [key, value] of Object.entries(SUBSCRIBE_API_SECURITY_HEADERS)) {
+    res.setHeader(key, value);
+  }
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('X-Request-Id', requestId);
   res.end(JSON.stringify(payload));
 }

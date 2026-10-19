@@ -24,9 +24,9 @@ describe('Footer status badge', () => {
     );
 
     expect(await screen.findByText(/all systems normal/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open wraith protocol status page/i })).toHaveAttribute(
-      'href',
-      'https://status.usewraith.xyz',
-    );
+    // The status host is not provisioned yet, so the badge opens the on-site page.
+    const badge = screen.getByRole('link', { name: /open wraith protocol status page/i });
+    expect(badge).toHaveAttribute('href', '/status');
+    expect(badge).not.toHaveAttribute('target');
   });
 });

@@ -20,6 +20,7 @@ const knownRoutes = [
   '/stellar',
   '/careers',
   '/press',
+  '/terms',
 ];
 
 function getCaseStudyRoutes(): string[] {

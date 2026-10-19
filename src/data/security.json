@@ -2,12 +2,12 @@
   "contact": {
     "email": "security@usewraith.xyz",
     "pgp": {
-      "enabled": true,
+      "enabled": false,
       "fingerprint": "ABCD 1234 5678 90EF GHIJ  KLMN OPQR STUV WXYZ 0123",
       "keyUrl": "https://keys.openpgp.org/vks/v1/by-fingerprint/ABCD123456789..."
     },
     "preferredLanguages": ["en"],
-    "acknowledgments": "https://docs.usewraith.xyz/security/disclosures"
+    "acknowledgments": "https://usewraith.xyz/security#disclosures"
   },
   "threatModel": {
     "summary": "Wraith Protocol implements stealth address cryptography (ERC-5564/ERC-6538) for unlinkable payments. Our threat model assumes adversaries can observe all blockchain data and network traffic but cannot break discrete log assumptions or compromise user key material stored in secure enclaves.",
@@ -52,19 +52,19 @@
     "scope": "Core SDK cryptographic implementation (ERC-5564 stealth address derivation and scanning)",
     "findings": "3 low-severity findings, all remediated",
     "nextScheduled": "2026-12-15",
-    "reports": "https://docs.usewraith.xyz/security/audits"
+    "reports": "https://usewraith.xyz/security#audits"
   },
   "bounty": {
     "status": "active",
     "platform": "self-hosted",
-    "url": "https://docs.usewraith.xyz/security/bug-bounty",
+    "url": "https://usewraith.xyz/security#bug-bounty",
     "maxReward": "$10,000 USD",
     "eligibility": "Vulnerabilities in @wraith-protocol/sdk, stealth address implementation, or key infrastructure components.",
     "ineligibility": "Issues already known, out-of-scope systems, or non-security bugs."
   },
   "disclosures": {
     "count": 2,
-    "public": "https://docs.usewraith.xyz/security/disclosures"
+    "public": "https://usewraith.xyz/security#disclosures"
   },
   "compliance": {
     "standards": ["OWASP Top 10", "CWE Top 25", "RFC 9116 (security.txt)"],

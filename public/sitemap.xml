@@ -61,6 +61,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://usewraith.xyz/terms</loc>
+    <lastmod>2026-10-19</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://usewraith.xyz/case-studies/payroll-processor</loc>
     <lastmod>2026-10-19</lastmod>
     <changefreq>weekly</changefreq>

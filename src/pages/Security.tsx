@@ -1,8 +1,16 @@
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import securityData from '../data/security.json';
+import { useScrollToHash } from '../hooks/useScrollToHash';
+
+// Links to sections of this site stay in the tab; other sites open a new one.
+const newTab = (href: string) =>
+  /^https?:\/\//.test(href) && !href.startsWith('https://usewraith.xyz/')
+    ? { target: '_blank', rel: 'noopener noreferrer' }
+    : {};
 
 export default function Security() {
+  useScrollToHash();
   const {
     contact,
     threatModel,
@@ -241,7 +249,7 @@ export default function Security() {
         </section>
 
         {/* Security Audits */}
-        <section className="mb-12">
+        <section id="audits" className="mb-12">
           <h2 className="mb-4 font-heading text-2xl font-semibold text-on-surface">
             Security Audits
           </h2>
@@ -280,8 +288,7 @@ export default function Security() {
             </div>
             <a
               href={audits.reports}
-              target="_blank"
-              rel="noopener noreferrer"
+              {...newTab(audits.reports)}
               className="inline-flex items-center gap-2 font-body text-sm text-primary transition-colors hover:text-primary-variant"
             >
               View Audit Reports ↗
@@ -290,7 +297,7 @@ export default function Security() {
         </section>
 
         {/* Bug Bounty */}
-        <section className="mb-12">
+        <section id="bug-bounty" className="mb-12">
           <h2 className="mb-4 font-heading text-2xl font-semibold text-on-surface">
             Bug Bounty Program
           </h2>
@@ -332,8 +339,7 @@ export default function Security() {
 
             <a
               href={bounty.url}
-              target="_blank"
-              rel="noopener noreferrer"
+              {...newTab(bounty.url)}
               className="inline-flex items-center gap-2 font-body text-sm text-primary transition-colors hover:text-primary-variant"
             >
               View Bounty Program ↗
@@ -342,7 +348,7 @@ export default function Security() {
         </section>
 
         {/* Public Disclosures */}
-        <section className="mb-12">
+        <section id="disclosures" className="mb-12">
           <h2 className="mb-4 font-heading text-2xl font-semibold text-on-surface">
             Public Disclosures
           </h2>
@@ -360,8 +366,7 @@ export default function Security() {
             </div>
             <a
               href={disclosures.public}
-              target="_blank"
-              rel="noopener noreferrer"
+              {...newTab(disclosures.public)}
               className="inline-flex items-center gap-2 font-body text-sm text-primary transition-colors hover:text-primary-variant"
             >
               View Disclosure Log ↗
@@ -516,12 +521,12 @@ export default function Security() {
               Privacy Policy →
             </Link>
             <a
-              href="https://docs.usewraith.xyz/security"
+              href="https://docs.usewraith.xyz/architecture/tee"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded border border-outline-variant bg-surface-container px-4 py-2 font-body text-sm text-on-surface transition-colors hover:border-outline hover:bg-surface-bright"
             >
-              Full Security Docs ↗
+              TEE Security Model ↗
             </a>
           </div>
         </section>

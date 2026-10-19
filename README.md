@@ -56,6 +56,32 @@ The subscribe endpoint accepts JSON bodies up to 2,048 bytes and the documented 
 15-minute window; the in-memory, HMAC-keyed limiter avoids retaining raw IP addresses
 and is scoped to each warm serverless instance.
 
+## Link checks
+
+```bash
+pnpm build && pnpm check:links                 # the build, served by scripts/preview-server.ts
+pnpm check:links --base https://usewraith.xyz  # production
+pnpm test:link-check                           # unit tests for the checker
+```
+
+`scripts/check-links.ts` starts from the sitemap and renders every public route in
+Chromium. It fails on routes that answer with an error or the 404 page, internal links
+to missing routes, files or `#fragments`, canonical and hreflang URLs that are missing,
+duplicated, off-site or not the page itself, feeds that are not served as XML, and
+external links. `--report <file>` writes the results as JSON and `--no-external` skips
+external links.
+
+External links must point at a host listed in `scripts/link-check/external-links.json`.
+Add a host there when the site starts linking to it, and give a `reason` whenever an
+entry needs `acceptStatus` or `skipRequest`. Approved links are requested through
+`scripts/link-check/safe-request.ts`: only public addresses are allowed (loopback,
+private, link-local, IPv4-mapped forms of those, and so on are refused), each hop
+connects to the address its DNS lookup validated, and redirects are re-validated. The
+browser that renders pages can only load the site under test.
+
+CI runs the checker on every pull request against the build, and every day against
+production.
+
 ## SEO & Metadata
 
 - **`robots.txt`**: Located in `public/robots.txt` and copied to the build root. It allows search engine crawling while excluding staging, preview, admin, and 404 routes, and points crawlers to the sitemap location.

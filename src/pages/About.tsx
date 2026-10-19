@@ -2,6 +2,10 @@ import { Helmet } from 'react-helmet-async';
 import { trackOutbound } from '../utils/track';
 import teamData from '../data/team.json';
 
+type TeamMember = (typeof teamData.team)[number] & { github?: string; twitter?: string };
+
+const team: TeamMember[] = teamData.team;
+
 const socialIcon = (type: 'github' | 'twitter') => {
   if (type === 'github') {
     return (
@@ -81,7 +85,7 @@ export default function About() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {teamData.team.map((member) => (
+            {team.map((member) => (
               <div
                 key={member.name}
                 className="flex flex-col gap-5 border border-outline-variant bg-surface-container p-7 transition-colors duration-150 hover:bg-surface-bright"
@@ -111,7 +115,7 @@ export default function About() {
                 <p className="font-body text-[13px] leading-[1.65] text-on-surface-variant">
                   {member.bio}
                 </p>
-                {'github' in member && (
+                {member.github && (
                   <div className="mt-auto flex gap-3">
                     <a
                       href={member.github}
@@ -123,7 +127,7 @@ export default function About() {
                     >
                       {socialIcon('github')}
                     </a>
-                    {'twitter' in member && (
+                    {member.twitter && (
                       <a
                         href={member.twitter}
                         target="_blank"
