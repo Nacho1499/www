@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import faqData from '../data/faq.json';
-import { faqPage } from '../utils/jsonld';
+import { faqPage, serializeJsonLd } from '../utils/jsonld';
 
 type FaqEntry = {
   id: string;
@@ -78,7 +78,7 @@ export default function Faq() {
     <div className="min-h-screen bg-surface text-on-surface">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqStructuredData) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqStructuredData) }}
       />
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
         <Link to="/" className="flex items-center gap-3">

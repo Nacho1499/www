@@ -1,0 +1,41 @@
+{
+  "$comment": "Hosts the site may link to. scripts/check-links.ts fails on links to any other host, and requests links to these hosts through safe-request.ts. Keep entries narrow: exact hosts, and acceptStatus or skipRequest only for a documented false positive.",
+  "approvedHosts": [
+    { "host": "docs.usewraith.xyz" },
+    { "host": "demo.usewraith.xyz" },
+    { "host": "console.usewraith.xyz" },
+    { "host": "github.com" },
+    {
+      "host": "www.npmjs.com",
+      "acceptStatus": [403],
+      "reason": "npm answers automated clients with a Cloudflare challenge (HTTP 403)."
+    },
+    { "host": "eips.ethereum.org" },
+    { "host": "stellar.org" },
+    { "host": "developers.stellar.org" },
+    { "host": "soroban.stellar.org" },
+    { "host": "stellar.expert" },
+    { "host": "www.drips.network" },
+    { "host": "aqua.network" },
+    { "host": "albedo.link" },
+    { "host": "blend.capital" },
+    { "host": "freighter.app" },
+    { "host": "horizen.io" },
+    { "host": "lobstr.co" },
+    { "host": "reflector.network" },
+    { "host": "soroswap.finance" },
+    { "host": "xbull.app" },
+    { "host": "plausible.io" },
+    { "host": "fonts.google.com" },
+    {
+      "host": "twitter.com",
+      "skipRequest": true,
+      "reason": "X serves the same login-walled app shell for every handle and blocks automated clients, so a request cannot tell a live profile from a missing one."
+    },
+    {
+      "host": "x.com",
+      "skipRequest": true,
+      "reason": "X serves the same login-walled app shell for every handle and blocks automated clients, so a request cannot tell a live profile from a missing one."
+    }
+  ]
+}

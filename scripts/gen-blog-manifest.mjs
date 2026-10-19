@@ -131,7 +131,7 @@ function loadBlogPostsJson() {
 function main() {
   if (!fs.existsSync(contentDir)) {
     console.log('No blog content directory found');
-    fs.writeFileSync(outputPath, JSON.stringify([], null, 2));
+    fs.writeFileSync(outputPath, JSON.stringify([], null, 2) + '\n');
     return;
   }
 
@@ -166,7 +166,7 @@ function main() {
 
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  fs.writeFileSync(outputPath, JSON.stringify(entries, null, 2));
+  fs.writeFileSync(outputPath, JSON.stringify(entries, null, 2) + '\n');
   console.log(`Generated blog-manifest.json with ${entries.length} posts`);
 }
 
