@@ -46,7 +46,7 @@
     },
     "stats": {
       "chainsLabel": "CADENAS SOPORTADAS",
-      "bundleLabel": "SDK BUNDLE",
+      "bundleLabel": "EVM ESM ENTRYPOINT · GZIP -9",
       "ercLabel": "ESTÁNDAR ERC"
     },
     "code": {

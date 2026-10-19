@@ -46,7 +46,7 @@
     },
     "stats": {
       "chainsLabel": "CHAINS SUPPORTED",
-      "bundleLabel": "SDK BUNDLE",
+      "bundleLabel": "EVM ESM ENTRYPOINT · GZIP -9",
       "ercLabel": "ERC STANDARD"
     },
     "code": {

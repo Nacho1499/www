@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { trackEvent } from '../analytics';
 import { track } from '../utils/track';
+import { EVM_SDK_ESM_ENTRYPOINT_GZIP_KB } from '../generated/sdk-size';
 
 type CodeLine = {
   content: string;
@@ -214,7 +215,9 @@ export default function Hero() {
             <span className="font-mono text-[10px] font-semibold tracking-[1.5px] text-outline">
               {t('hero.stats.bundleLabel')}
             </span>
-            <span className="font-heading text-xl font-bold text-on-surface">14.2 KB</span>
+            <span className="font-heading text-xl font-bold text-on-surface">
+              {EVM_SDK_ESM_ENTRYPOINT_GZIP_KB.toFixed(1)} kB
+            </span>
           </div>
           <div className="flex flex-col gap-1">
             <span className="font-mono text-[10px] font-semibold tracking-[1.5px] text-outline">

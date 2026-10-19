@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { copyToClipboard } from '../utils/clipboard';
+import { EVM_SDK_ESM_ENTRYPOINT_GZIP_KB } from '../generated/sdk-size';
 
 const BRAND_COLORS = [
   { name: 'Surface', hex: '#0e0e0e', label: 'Background' },
@@ -108,7 +109,7 @@ export default function Press() {
             <div className="flex flex-col gap-2">
               <p className="font-body text-[12px] text-outline">50-word</p>
               <CopyBlock>
-                {`Wraith Protocol is an open-source, multi-chain stealth-address toolkit built on ERC-5564 and ERC-6538. It lets developers add receiver-unlinkable private payments to any app in minutes. Wraith supports EVM chains, Stellar (with memo-enabled stealth), Solana, and CKB — shipping as a 14.2 KB TypeScript SDK with zero external dependencies.`}
+                {`Wraith Protocol is an open-source, multi-chain stealth-address toolkit built on ERC-5564 and ERC-6538. It lets developers add receiver-unlinkable private payments to any app in minutes. Wraith supports EVM chains, Stellar (with memo-enabled stealth), Solana, and CKB — shipping with an EVM ESM entrypoint of ${EVM_SDK_ESM_ENTRYPOINT_GZIP_KB.toFixed(1)} kB gzipped at level 9.`}
               </CopyBlock>
             </div>
 
@@ -117,7 +118,7 @@ export default function Press() {
               <CopyBlock>
                 {`Wraith Protocol is an open-source, developer-first stealth-address infrastructure layer designed to bring practical financial privacy to every blockchain ecosystem. Built on the ERC-5564 and ERC-6538 standards, Wraith enables receiver-unlinkable payments — where each transaction is sent to a one-time stealth address that only the intended recipient can discover and spend from, breaking the on-chain link between sender and receiver.
 
-Wraith ships as a lightweight TypeScript SDK (14.2 KB gzipped) with first-class support for EVM-compatible chains via Horizen, Stellar with memo-enabled stealth flows, Solana, and CKB. Developers can integrate private payments into wallets, dApps, and payment flows in minutes without running any off-chain infrastructure.
+Wraith ships as a lightweight TypeScript SDK with first-class support for EVM-compatible chains via Horizen, Stellar with memo-enabled stealth flows, Solana, and CKB. The published ESM entrypoint file at @wraith-protocol/sdk/chains/evm is ${EVM_SDK_ESM_ENTRYPOINT_GZIP_KB.toFixed(1)} kB gzipped at level 9. Developers can integrate private payments into wallets, dApps, and payment flows in minutes without running any off-chain infrastructure.
 
 Beyond the SDK, Wraith provides a hosted stealth-address registry, a non-custodial web console for end users, and an open demo that illustrates the full send-scan-withdraw lifecycle. The protocol is live on four testnets and is a Stellar Wave grantee through the Stellar Development Foundation's Drips program.
 
