@@ -1,4 +1,5 @@
 import Header from '../components/Header';
+import { useScrollToHash } from '../hooks/useScrollToHash';
 import Footer from '../components/Footer';
 import roadmap from '../data/roadmap.json';
 
@@ -34,6 +35,7 @@ const statusMeta: Record<Status, { label: string; marker: string; badge: string 
 const milestones = roadmap.milestones as Milestone[];
 
 export default function Roadmap() {
+  useScrollToHash();
   return (
     <div className="bg-surface text-on-surface">
       <a href="#main-content" className="skip-link">
@@ -74,6 +76,7 @@ export default function Roadmap() {
               return (
                 <li
                   key={milestone.id}
+                  id={milestone.id}
                   className="relative border-l border-outline-variant-30 pb-10 pl-8 last:pb-0 lg:flex-1 lg:border-l-0 lg:border-t lg:pb-0 lg:pl-0 lg:pr-5 lg:pt-8 lg:last:pr-0"
                 >
                   <span

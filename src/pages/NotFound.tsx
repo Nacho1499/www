@@ -48,7 +48,7 @@ export default function NotFound() {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface">
+    <div className="min-h-screen bg-surface text-on-surface" data-page="not-found">
       <header className="flex items-center justify-between px-6 py-5 md:px-12">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo.png" alt="Wraith" width={30} height={24} className="h-6 opacity-90" />

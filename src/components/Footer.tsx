@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { trackOutbound } from '../utils/track';
+import { useLocalizedPath } from '../hooks/useLocalePath';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,7 +20,9 @@ const acknowledgments = [
   { label: 'Drips', src: '/logos/drips-mark.svg' },
 ];
 
-const statusPageUrl = import.meta.env.VITE_STATUS_PAGE_URL || 'https://status.usewraith.xyz';
+// The status host is not provisioned yet, so the on-site status page is the default.
+const statusPageUrl = import.meta.env.VITE_STATUS_PAGE_URL || '/status';
+const statusPageIsExternal = /^https?:\/\//.test(statusPageUrl);
 const statusApiUrl = import.meta.env.VITE_STATUS_API_URL || '';
 
 function normalizeStatus(payload: unknown): StatusState {
@@ -40,6 +43,7 @@ type WidgetState = 'idle' | 'submitting' | 'success' | 'error';
 
 function NewsletterWidget() {
   const { t } = useTranslation();
+  const lp = useLocalizedPath();
   const [email, setEmail] = useState('');
   const [state, setState] = useState<WidgetState>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -138,7 +142,7 @@ function NewsletterWidget() {
       )}
 
       <Link
-        to="/newsletter"
+        to={lp('/newsletter')}
         className="font-body text-[11px] text-outline transition-colors hover:text-on-surface-variant"
       >
         {t('newsletter.footerWidget.label').toLowerCase()} →
@@ -151,6 +155,7 @@ function NewsletterWidget() {
 
 export default function Footer() {
   const { t } = useTranslation();
+  const lp = useLocalizedPath();
   const [status, setStatus] = useState<StatusState>({
     label: 'Checking status...',
     tone: 'neutral',
@@ -214,16 +219,22 @@ export default function Footer() {
         { label: t('footer.product.docs'), href: 'https://docs.usewraith.xyz' },
         { label: t('footer.product.demo'), href: 'https://demo.usewraith.xyz' },
         { label: t('footer.product.console'), href: 'https://console.usewraith.xyz' },
-        { label: t('footer.product.compare'), href: '#compare' },
+        { label: t('footer.product.compare'), href: '/#compare' },
         { label: t('footer.product.faq'), href: '/faq' },
-        { label: t('footer.product.changelog'), href: 'https://docs.usewraith.xyz/changelog' },
+        {
+          label: t('footer.product.changelog'),
+          href: 'https://github.com/wraith-protocol/sdk/blob/develop/CHANGELOG.md',
+        },
       ],
     },
     {
       title: t('footer.columns.developers'),
       links: [
         { label: t('footer.developers.sdk'), href: 'https://docs.usewraith.xyz/sdk/overview' },
-        { label: t('footer.developers.apiReference'), href: 'https://docs.usewraith.xyz/api' },
+        {
+          label: t('footer.developers.apiReference'),
+          href: 'https://docs.usewraith.xyz/api-reference/endpoints',
+        },
         { label: t('footer.developers.github'), href: 'https://github.com/wraith-protocol' },
         {
           label: t('footer.developers.npm'),
@@ -236,14 +247,15 @@ export default function Footer() {
       links: [
         { label: t('footer.resources.erc5564'), href: 'https://eips.ethereum.org/EIPS/eip-5564' },
         { label: t('footer.resources.erc6538'), href: 'https://eips.ethereum.org/EIPS/eip-6538' },
-        { label: t('footer.resources.security'), href: 'https://docs.usewraith.xyz/security' },
+        { label: t('footer.resources.security'), href: '/security' },
         { label: t('footer.resources.press'), href: '/press' },
-        { label: 'Blog', href: '/blog' },
-        { label: 'Stellar Integration', href: '/stellar' },
-        { label: 'Careers', href: '/careers' },
-        { label: 'About', href: '/about' },
-        { label: 'Governance', href: '/governance' },
-        { label: 'Web Vitals', href: '/vitals' },
+        { label: t('footer.resources.blog'), href: '/blog' },
+        { label: t('footer.resources.caseStudies'), href: '/case-studies' },
+        { label: t('footer.resources.stellar'), href: '/stellar' },
+        { label: t('footer.resources.careers'), href: '/careers' },
+        { label: t('footer.resources.about'), href: '/about' },
+        { label: t('footer.resources.governance'), href: '/governance' },
+        { label: t('footer.resources.vitals'), href: '/vitals' },
       ],
     },
     {
@@ -285,7 +297,7 @@ export default function Footer() {
                     return (
                       <Link
                         key={link.label}
-                        to={link.href}
+                        to={lp(link.href)}
                         className="font-body text-[13px] text-on-surface-variant transition-colors duration-150 hover:text-on-surface"
                       >
                         {link.label}
@@ -347,9 +359,9 @@ export default function Footer() {
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
             <a
               href={statusPageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={trackOutbound('other')}
+              target={statusPageIsExternal ? '_blank' : undefined}
+              rel={statusPageIsExternal ? 'noopener noreferrer' : undefined}
+              onClick={statusPageIsExternal ? trackOutbound('other') : undefined}
               aria-label="Open Wraith Protocol status page"
               className={`inline-flex items-center gap-2 rounded-none border px-2.5 py-1.5 font-body text-[11px] uppercase tracking-[1.5px] transition-colors duration-150 ${status.tone}`}
             >
@@ -368,18 +380,17 @@ export default function Footer() {
               <span>{status.label}</span>
             </a>
             <Link
-              to="/privacy"
+              to={lp('/privacy')}
               className="font-body text-xs text-outline transition-colors duration-150 hover:text-on-surface-variant"
             >
               {t('footer.legal.privacy')}
             </Link>
-            <a
-              href="https://usewraith.xyz/terms"
-              onClick={trackOutbound('other')}
+            <Link
+              to={lp('/terms')}
               className="font-body text-xs text-outline transition-colors duration-150 hover:text-on-surface-variant"
             >
               {t('footer.legal.terms')}
-            </a>
+            </Link>
             <a
               href="https://usewraith.xyz/.well-known/security.txt"
               onClick={trackOutbound('other')}
