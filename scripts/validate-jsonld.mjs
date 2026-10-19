@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
+  serializeJsonLd,
   organization,
   article,
   faqPage,
@@ -285,4 +286,93 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`\nAll ${blobs.length} JSON-LD blobs are valid.`);
+// --- Serialization safety ---------------------------------------------------
+// Every blob above is injected into an inline <script type="application/ld+json">
+// through serializeJsonLd(). A raw `<` or `&` in the output would let the HTML
+// parser end the script element early, so assert the serializer neutralizes the
+// sequences and that the escaped text still parses back to the same blob.
+
+/** Content a hostile author could put in a title, answer or breadcrumb name. */
+const HOSTILE_FIXTURES = [
+  '</script>',
+  '</script><script>alert(1)</script>',
+  '</ScRiPt >',
+  '<!--<script>',
+  ']]>',
+  '&lt;script&gt;',
+  '<img src=x onerror=alert(1)>',
+  'before\u2028after',
+  'before\u2029after',
+];
+
+console.log('\nChecking serializeJsonLd against hostile content...');
+
+let serializationFailures = 0;
+
+function checkSerialization(label, blob) {
+  const out = serializeJsonLd(blob);
+
+  if (/[<>&]/.test(out)) {
+    fail(`${label}: serializer emitted a raw <, > or & character`);
+    serializationFailures += 1;
+    return;
+  }
+  if (out.toLowerCase().includes('</script')) {
+    fail(`${label}: serializer emitted a script-closing sequence`);
+    serializationFailures += 1;
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(out);
+  } catch (error) {
+    fail(`${label}: serialized output is not valid JSON (${error.message})`);
+    serializationFailures += 1;
+    return;
+  }
+
+  if (JSON.stringify(parsed) !== JSON.stringify(blob)) {
+    fail(`${label}: escaping changed the value instead of only its encoding`);
+    serializationFailures += 1;
+    return;
+  }
+
+  ok(`${label} (escaped, round-trips)`);
+}
+
+// 1. Every blob shape, with each hostile fixture injected into its string fields.
+for (const fixture of HOSTILE_FIXTURES) {
+  checkSerialization(
+    `Article with ${JSON.stringify(fixture)}`,
+    article({
+      headline: fixture,
+      description: fixture,
+      datePublished: '2026-01-01',
+      authorName: fixture,
+      url: `${SITE_URL}/blog/hostile`,
+    }),
+  );
+  checkSerialization(
+    `FAQPage with ${JSON.stringify(fixture)}`,
+    faqPage([{ question: fixture, answer: fixture }]),
+  );
+  checkSerialization(
+    `BreadcrumbList with ${JSON.stringify(fixture)}`,
+    breadcrumbList([{ name: fixture, url: `${SITE_URL}/hostile` }]),
+  );
+  checkSerialization(
+    `HowTo with ${JSON.stringify(fixture)}`,
+    howTo({ name: fixture, steps: [{ name: fixture, text: fixture }] }),
+  );
+}
+
+// 2. The real blobs assembled above must also serialize cleanly.
+blobs.forEach(({ label, blob }) => checkSerialization(`serialize: ${label}`, blob));
+
+if (serializationFailures > 0) {
+  console.error(`\nJSON-LD serialization failed: ${serializationFailures} error(s).`);
+  process.exit(1);
+}
+
+console.log(`\nAll ${blobs.length} JSON-LD blobs serialize safely.`);

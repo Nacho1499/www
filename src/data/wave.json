@@ -9,7 +9,7 @@
     "fundingSource": "Drips + External",
     "description": "Funding for teams building stealth address infrastructure, SDK integrations, and developer tooling. If you are building privacy-preserving payment rails, stealth-address middleware, or tooling that makes unlinkable payments easier to ship, this wave is for you.",
     "howToApply": "Submit your proposal through the Drips platform. Include a clear scope, timeline, and budget breakdown with defined milestones.",
-    "applyUrl": "https://drips.network/grants/wraith/wave-1",
+    "applyUrl": "https://www.drips.network/wave/stellar",
     "rewardRange": "$5,000 – $50,000",
     "eligibility": [
       "Open to individual developers and teams",

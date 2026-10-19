@@ -7,6 +7,22 @@ on:
     branches: [main, develop]
 
 jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The serverless smoke tests serve the built `dist/` output, so the full
+      # suite only runs against a fresh build.
+      - run: pnpm build
+      - run: pnpm test
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +37,7 @@ jobs:
         run: pnpm audit --prod --audit-level=high
       - run: pnpm format:check
       - run: pnpm lint:i18n
+      - run: pnpm validate:content
       - run: pnpm test:a11y
       - run: pnpm build
       - run: pnpm validate:jsonld
@@ -48,6 +65,35 @@ jobs:
 
       - name: Smoke test the serverless routes
         run: pnpm test:smoke
+
+  link-check:
+    name: Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:link-check
+      - run: pnpm build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Check links in the build
+        run: pnpm check:links --report link-check-report.json
+
+      - name: Upload link check report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-check-report
+          path: link-check-report.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   playwright-a11y:
     name: Playwright A11y Gate

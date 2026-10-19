@@ -6,13 +6,13 @@
         "label": "Smart Contract Audit",
         "status": "scheduled",
         "detail": "Stealth address contracts — scheduled for Phase 3",
-        "link": "https://docs.usewraith.xyz/security"
+        "link": "https://usewraith.xyz/security"
       },
       {
         "label": "TEE Attestation",
         "status": "verified",
         "detail": "AI agents run inside Phala Network Intel TDX enclaves",
-        "link": "https://docs.usewraith.xyz/security"
+        "link": "https://usewraith.xyz/security"
       }
     ]
   },
@@ -20,12 +20,12 @@
     "eyebrow": "Ecosystem",
     "count": 10,
     "label": "Live chain & wallet integrations",
-    "link": "https://docs.usewraith.xyz/ecosystem"
+    "link": "https://usewraith.xyz/ecosystem"
   },
   "uptime": {
     "eyebrow": "Reliability",
     "fallbackPercent": "99.95",
     "windowLabel": "Last 90 days",
-    "statusPageUrl": "https://status.usewraith.xyz"
+    "statusPageUrl": "https://usewraith.xyz/status"
   }
 }
