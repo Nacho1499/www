@@ -46,10 +46,15 @@ pnpm test:smoke
 ```
 
 Smoke tests run against `scripts/preview-server.ts` over HTTP: the subscribe proxy
-(including invalid input, provider conflicts, outages and the unconfigured case) and
+(including validation, rate limiting, duplicate submissions, provider outages and the unconfigured case) and
 the OG image endpoint (rendering, query escaping, cache headers and the failure
 response). Buttondown is stubbed, so no mail is sent and no test touches the network.
 The suite runs on every pull request in CI.
+
+The subscribe endpoint accepts JSON bodies up to 2,048 bytes and the documented `newsletter`
+(default) and `careers` tags. It allows five submissions per Vercel client IP per
+15-minute window; the in-memory, HMAC-keyed limiter avoids retaining raw IP addresses
+and is scoped to each warm serverless instance.
 
 ## SEO & Metadata
 

@@ -1,14 +1,25 @@
 // Unit tests for the newsletter proxy. Lives outside `src` because the Vercel
 // function in `api/` is intentionally excluded from the site's tsc/Vite build.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import handler, { BUTTONDOWN_API_URL, UPSTREAM_TIMEOUT_MS } from '../api/subscribe';
+import handler, {
+  BUTTONDOWN_API_URL,
+  MAX_REQUEST_BODY_BYTES,
+  RATE_LIMIT_REQUESTS,
+  RATE_LIMIT_WINDOW_MS,
+  UPSTREAM_TIMEOUT_MS,
+} from '../api/subscribe';
 
 // ─── Harness ─────────────────────────────────────────────────────────────────
 
 type HandlerRequest = Parameters<typeof handler>[0];
 type HandlerResponse = Parameters<typeof handler>[1];
 
-type SubscribeResponseBody = { error?: string; code?: string; ok?: boolean };
+type SubscribeResponseBody = {
+  error?: string;
+  code?: string;
+  ok?: boolean;
+  retryAfter?: number;
+};
 
 interface CapturedResponse {
   statusCode: number;
@@ -36,12 +47,32 @@ function createResponse(): CapturedResponse {
   };
 }
 
-function createRequest(body: unknown, method = 'POST'): HandlerRequest {
-  return { method, headers: {}, body } as unknown as HandlerRequest;
+let requestIp = 0;
+
+function createRequest(
+  body: unknown,
+  method = 'POST',
+  headers: Record<string, string> = {},
+): HandlerRequest {
+  requestIp = (requestIp % 200) + 1;
+  return {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      'x-vercel-forwarded-for': `198.51.100.${requestIp}`,
+      ...headers,
+    },
+    body,
+  } as unknown as HandlerRequest;
 }
 
-async function invoke(body: unknown, method = 'POST', response = createResponse()) {
-  await handler(createRequest(body, method), response as unknown as HandlerResponse);
+async function invoke(
+  body: unknown,
+  method = 'POST',
+  response = createResponse(),
+  headers: Record<string, string> = {},
+) {
+  await handler(createRequest(body, method, headers), response as unknown as HandlerResponse);
   return response;
 }
 
@@ -109,6 +140,39 @@ describe('subscribe proxy — request validation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects unsupported content types', async () => {
+    const response = await invoke({ email: VALID_EMAIL }, 'POST', createResponse(), {
+      'content-type': 'text/plain',
+    });
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json()).toMatchObject({ code: 'unsupported_media_type' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects bodies over the configured limit', async () => {
+    const declaredOversize = await invoke({ email: VALID_EMAIL }, 'POST', createResponse(), {
+      'content-length': String(MAX_REQUEST_BODY_BYTES + 1),
+    });
+    const actualOversize = await invoke({
+      email: `${'a'.repeat(MAX_REQUEST_BODY_BYTES)}@example.com`,
+    });
+
+    expect(declaredOversize.statusCode).toBe(413);
+    expect(declaredOversize.json()).toMatchObject({ code: 'payload_too_large' });
+    expect(actualOversize.statusCode).toBe(413);
+    expect(actualOversize.json()).toMatchObject({ code: 'payload_too_large' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['admin', 'newsletter,careers', 42])('rejects unsupported tags (%s)', async (tag) => {
+    const response = await invoke({ email: VALID_EMAIL, tag });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ code: 'invalid_tag' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('exposes a request id on every response', async () => {
     fetchMock.mockResolvedValue(providerResponse(201));
 
@@ -140,27 +204,91 @@ describe('subscribe proxy — success', () => {
   });
 });
 
+describe('subscribe proxy — abuse protection', () => {
+  it('deduplicates concurrent submissions for the same normalized email', async () => {
+    let resolveProvider!: (response: Response) => void;
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveProvider = resolve;
+        }),
+    );
+
+    const first = invoke({ email: ' User@Example.com ' }, 'POST', createResponse(), {
+      'x-vercel-forwarded-for': '198.51.100.220',
+    });
+    const second = invoke({ email: VALID_EMAIL }, 'POST', createResponse(), {
+      'x-vercel-forwarded-for': '198.51.100.221',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveProvider(providerResponse(201));
+    const responses = await Promise.all([first, second]);
+
+    expect(responses.map(({ statusCode, body }) => [statusCode, body])).toEqual([
+      [201, '{"ok":true}'],
+      [201, '{"ok":true}'],
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rate limits by the trusted Vercel IP and returns stable retry information', async () => {
+    fetchMock.mockResolvedValue(providerResponse(201));
+    const trustedIp = '198.51.100.230';
+
+    for (let attempt = 0; attempt < RATE_LIMIT_REQUESTS; attempt += 1) {
+      const response = await invoke(
+        { email: `reader-${attempt}@example.com` },
+        'POST',
+        createResponse(),
+        {
+          'x-vercel-forwarded-for': trustedIp,
+          'x-forwarded-for': `203.0.113.${attempt + 1}`,
+        },
+      );
+      expect(response.statusCode).toBe(201);
+    }
+
+    const limited = await invoke({ email: 'another@example.com' }, 'POST', createResponse(), {
+      'x-vercel-forwarded-for': trustedIp,
+      'x-forwarded-for': '203.0.113.99',
+    });
+
+    expect(limited.statusCode).toBe(429);
+    const retryAfter = Number(limited.headers['retry-after']);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(RATE_LIMIT_WINDOW_MS / 1000);
+    expect(limited.json()).toEqual({
+      error: 'Too many requests. Please try again later.',
+      code: 'rate_limited',
+      retryAfter,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(RATE_LIMIT_REQUESTS);
+    expect(limited.body).not.toContain('subscribed');
+  });
+});
+
 // ─── Provider 4xx ────────────────────────────────────────────────────────────
 
 describe('subscribe proxy — provider 4xx', () => {
-  it('maps a 409 to already_subscribed', async () => {
+  it('returns the same success response for addresses already on the list', async () => {
     fetchMock.mockResolvedValue(providerResponse(409));
 
     const response = await invoke({ email: VALID_EMAIL });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ code: 'already_subscribed' });
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ ok: true });
   });
 
   it.each(['email_already_exists', 'subscriber_already_exists'])(
-    'maps a 400 with code %s to already_subscribed',
+    'does not reveal an existing address from provider code %s',
     async (code) => {
       fetchMock.mockResolvedValue(providerResponse(400, { code }));
 
       const response = await invoke({ email: VALID_EMAIL });
 
-      expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({ code: 'already_subscribed' });
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toEqual({ ok: true });
     },
   );
 

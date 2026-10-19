@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 /**
@@ -17,8 +18,19 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  *   - Free tier covers the initial subscriber volume; no vendor lock-in
  */
 
-type SubscribeBody = { email?: string; tag?: string };
-type SubscribeRequest = IncomingMessage & { body?: SubscribeBody };
+type SubscribeBody = { email?: unknown; tag?: unknown };
+type SubscribeRequest = IncomingMessage & { body?: unknown };
+
+const SUPPORTED_TAGS = new Set(['newsletter', 'careers']);
+export const MAX_REQUEST_BODY_BYTES = 2048;
+export const RATE_LIMIT_REQUESTS = 5;
+export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const MAX_RATE_LIMIT_CLIENTS = 10_000;
+
+const rateLimitSecret = randomBytes(32);
+const rateLimitBuckets = new Map<string, { windowStartedAt: number; count: number }>();
+const inFlightSubmissions = new Map<string, Promise<SubscribeResult>>();
+let rateLimitChecks = 0;
 
 export const BUTTONDOWN_API_URL = 'https://api.buttondown.email/v1/subscribers';
 
@@ -35,16 +47,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@][^@]*\.[^\s@]+$/;
 export type SubscribeErrorCode =
   | 'method_not_allowed'
   | 'not_configured'
+  | 'unsupported_media_type'
+  | 'payload_too_large'
+  | 'invalid_request'
   | 'invalid_email'
-  | 'already_subscribed'
+  | 'invalid_tag'
+  | 'rate_limited'
   | 'upstream_timeout'
   | 'upstream_error';
 
 const ERROR_STATUS: Record<SubscribeErrorCode, number> = {
   method_not_allowed: 405,
   not_configured: 500,
+  unsupported_media_type: 415,
+  payload_too_large: 413,
+  invalid_request: 400,
   invalid_email: 422,
-  already_subscribed: 409,
+  invalid_tag: 422,
+  rate_limited: 429,
   upstream_timeout: 504,
   upstream_error: 502,
 };
@@ -52,8 +72,12 @@ const ERROR_STATUS: Record<SubscribeErrorCode, number> = {
 const ERROR_MESSAGE: Record<SubscribeErrorCode, string> = {
   method_not_allowed: 'Method not allowed.',
   not_configured: 'Subscription service is not configured.',
+  unsupported_media_type: 'Content-Type must be application/json.',
+  payload_too_large: 'Request body must be 2,048 bytes or less.',
+  invalid_request: 'Invalid request.',
   invalid_email: 'Enter a valid email address.',
-  already_subscribed: 'This email is already subscribed.',
+  invalid_tag: 'Unsupported subscription tag.',
+  rate_limited: 'Too many requests. Please try again later.',
   upstream_timeout: 'Subscription service timed out. Please try again.',
   upstream_error: 'Subscription service is unavailable.',
 };
@@ -93,6 +117,116 @@ function sendError(res: ServerResponse, requestId: string, code: SubscribeErrorC
   sendJson(res, requestId, ERROR_STATUS[code], { error: ERROR_MESSAGE[code], code });
 }
 
+function resolveClientKey(req: SubscribeRequest): string {
+  const forwardedFor = req.headers['x-vercel-forwarded-for'];
+  const clientIp = typeof forwardedFor === 'string' ? forwardedFor.trim() : '';
+  const trustedIp = isIP(clientIp) ? clientIp : 'unknown';
+  return createHmac('sha256', rateLimitSecret).update(trustedIp).digest('hex');
+}
+
+function checkRateLimit(clientKey: string, now = Date.now()): number | null {
+  rateLimitChecks += 1;
+  if (rateLimitChecks % 100 === 0 || rateLimitBuckets.size >= MAX_RATE_LIMIT_CLIENTS) {
+    for (const [key, bucket] of rateLimitBuckets) {
+      if (now - bucket.windowStartedAt >= RATE_LIMIT_WINDOW_MS) {
+        rateLimitBuckets.delete(key);
+      }
+    }
+  }
+
+  const bucket = rateLimitBuckets.get(clientKey);
+  if (!bucket || now - bucket.windowStartedAt >= RATE_LIMIT_WINDOW_MS) {
+    if (rateLimitBuckets.size >= MAX_RATE_LIMIT_CLIENTS) {
+      return Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
+    }
+    rateLimitBuckets.set(clientKey, { windowStartedAt: now, count: 1 });
+    return null;
+  }
+
+  if (bucket.count >= RATE_LIMIT_REQUESTS) {
+    return Math.max(1, Math.ceil((bucket.windowStartedAt + RATE_LIMIT_WINDOW_MS - now) / 1000));
+  }
+
+  bucket.count += 1;
+  return null;
+}
+
+type SubscribeResult = { status: number; payload: unknown };
+
+function isSubscribeBody(value: unknown): value is SubscribeBody {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function submitToProvider(
+  rawEmail: string,
+  tag: string,
+  apiKey: string,
+  requestId: string,
+): Promise<SubscribeResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+
+  try {
+    const bdRes = await fetch(BUTTONDOWN_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: rawEmail, tags: [tag], type: 'unconfirmed' }),
+      signal: controller.signal,
+    });
+
+    if (bdRes.status === 201 || bdRes.status === 409) {
+      logEvent(requestId, 'subscribed', 201);
+      return { status: 201, payload: { ok: true } };
+    }
+
+    if (bdRes.status === 400 || bdRes.status === 422) {
+      let code: unknown;
+      try {
+        const body = (await bdRes.json()) as Record<string, unknown> | null;
+        code = body?.code;
+      } catch {
+        code = undefined;
+      }
+
+      if (code === 'email_already_exists' || code === 'subscriber_already_exists') {
+        logEvent(requestId, 'subscribed', 201);
+        return { status: 201, payload: { ok: true } };
+      }
+
+      logEvent(requestId, 'invalid_email', 422);
+      return {
+        status: 422,
+        payload: { error: ERROR_MESSAGE.invalid_email, code: 'invalid_email' },
+      };
+    }
+
+    logEvent(requestId, 'upstream_error', bdRes.status);
+    return {
+      status: 502,
+      payload: { error: ERROR_MESSAGE.upstream_error, code: 'upstream_error' },
+    };
+  } catch {
+    if (controller.signal.aborted) {
+      logEvent(requestId, 'upstream_timeout', 504);
+      return {
+        status: 504,
+        payload: { error: ERROR_MESSAGE.upstream_timeout, code: 'upstream_timeout' },
+      };
+    }
+
+    logEvent(requestId, 'upstream_error', 502);
+    return {
+      status: 502,
+      payload: { error: ERROR_MESSAGE.upstream_error, code: 'upstream_error' },
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function handler(req: SubscribeRequest, res: ServerResponse) {
   const requestId = resolveRequestId(req);
 
@@ -109,8 +243,49 @@ export default async function handler(req: SubscribeRequest, res: ServerResponse
     return;
   }
 
-  const rawEmail = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
-  const tag = typeof req.body?.tag === 'string' ? req.body.tag.trim() : 'newsletter';
+  const contentType = req.headers['content-type'];
+  const mediaType = typeof contentType === 'string' ? contentType.split(';', 1)[0]?.trim() : '';
+  if (mediaType?.toLowerCase() !== 'application/json') {
+    logEvent(requestId, 'unsupported_media_type', 415);
+    sendError(res, requestId, 'unsupported_media_type');
+    return;
+  }
+
+  const declaredLength = req.headers['content-length'];
+  if (
+    declaredLength !== undefined &&
+    (typeof declaredLength !== 'string' || !/^\d+$/.test(declaredLength))
+  ) {
+    logEvent(requestId, 'invalid_request', 400);
+    sendError(res, requestId, 'invalid_request');
+    return;
+  }
+
+  if (declaredLength !== undefined && Number(declaredLength) > MAX_REQUEST_BODY_BYTES) {
+    logEvent(requestId, 'payload_too_large', 413);
+    sendError(res, requestId, 'payload_too_large');
+    return;
+  }
+
+  let serializedBody: string | undefined;
+  try {
+    serializedBody = JSON.stringify(req.body);
+  } catch {
+    logEvent(requestId, 'invalid_request', 400);
+    sendError(res, requestId, 'invalid_request');
+    return;
+  }
+
+  if (Buffer.byteLength(serializedBody ?? '', 'utf8') > MAX_REQUEST_BODY_BYTES) {
+    logEvent(requestId, 'payload_too_large', 413);
+    sendError(res, requestId, 'payload_too_large');
+    return;
+  }
+
+  const body = isSubscribeBody(req.body) ? req.body : {};
+  const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const tag =
+    body.tag === undefined ? 'newsletter' : typeof body.tag === 'string' ? body.tag.trim() : '';
 
   if (!rawEmail || !EMAIL_RE.test(rawEmail)) {
     logEvent(requestId, 'invalid_email', 422);
@@ -118,73 +293,36 @@ export default async function handler(req: SubscribeRequest, res: ServerResponse
     return;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
-
-  try {
-    const bdRes = await fetch(BUTTONDOWN_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      // Ask Buttondown to send the double opt-in confirmation email.
-      body: JSON.stringify({ email: rawEmail, tags: [tag], type: 'unconfirmed' }),
-      signal: controller.signal,
-    });
-
-    // 201 Created — subscription queued, confirmation email sent.
-    if (bdRes.status === 201) {
-      logEvent(requestId, 'subscribed', 201);
-      sendJson(res, requestId, 201, { ok: true });
-      return;
-    }
-
-    // Buttondown returns 409 when the address is already subscribed. Treat it
-    // as a distinct code so clients can show a friendly message without
-    // revealing list membership (the client decides whether to surface it).
-    if (bdRes.status === 409) {
-      logEvent(requestId, 'already_subscribed', 409);
-      sendError(res, requestId, 'already_subscribed');
-      return;
-    }
-
-    if (bdRes.status === 400 || bdRes.status === 422) {
-      let code: unknown;
-      try {
-        const body = (await bdRes.json()) as Record<string, unknown> | null;
-        code = body?.code;
-      } catch {
-        // Malformed or non-JSON provider body — fall through to invalid_email.
-        code = undefined;
-      }
-
-      if (code === 'email_already_exists' || code === 'subscriber_already_exists') {
-        logEvent(requestId, 'already_subscribed', 409);
-        sendError(res, requestId, 'already_subscribed');
-        return;
-      }
-
-      logEvent(requestId, 'invalid_email', 422);
-      sendError(res, requestId, 'invalid_email');
-      return;
-    }
-
-    // Every other provider response (auth failures, 429, 5xx, unexpected
-    // shapes) collapses into one stable client error so nothing about the
-    // upstream is exposed.
-    logEvent(requestId, 'upstream_error', bdRes.status);
-    sendError(res, requestId, 'upstream_error');
-  } catch {
-    // AbortController only fires on the timeout path here.
-    if (controller.signal.aborted) {
-      logEvent(requestId, 'upstream_timeout', 504);
-      sendError(res, requestId, 'upstream_timeout');
-      return;
-    }
-    logEvent(requestId, 'upstream_error', 502);
-    sendError(res, requestId, 'upstream_error');
-  } finally {
-    clearTimeout(timeout);
+  if (!SUPPORTED_TAGS.has(tag)) {
+    logEvent(requestId, 'invalid_tag', 422);
+    sendError(res, requestId, 'invalid_tag');
+    return;
   }
+
+  const retryAfter = checkRateLimit(resolveClientKey(req));
+  if (retryAfter !== null) {
+    logEvent(requestId, 'rate_limited', 429);
+    res.setHeader('Retry-After', String(retryAfter));
+    sendJson(res, requestId, 429, {
+      error: ERROR_MESSAGE.rate_limited,
+      code: 'rate_limited',
+      retryAfter,
+    });
+    return;
+  }
+
+  let submission = inFlightSubmissions.get(rawEmail);
+  if (!submission) {
+    submission = submitToProvider(rawEmail, tag, apiKey, requestId);
+    inFlightSubmissions.set(rawEmail, submission);
+    const clearSubmission = () => {
+      if (inFlightSubmissions.get(rawEmail) === submission) {
+        inFlightSubmissions.delete(rawEmail);
+      }
+    };
+    void submission.then(clearSubmission, clearSubmission);
+  }
+
+  const result = await submission;
+  sendJson(res, requestId, result.status, result.payload);
 }

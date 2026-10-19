@@ -84,10 +84,22 @@ function get(url: string): Promise<Response> {
   return fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
 }
 
-function postJson(url: string, body: unknown): Promise<Response> {
+let nextSmokeClientIp = 1;
+
+function postJson(
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<Response> {
+  const clientIp = `198.51.100.${nextSmokeClientIp}`;
+  nextSmokeClientIp = (nextSmokeClientIp % 200) + 1;
   return fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-vercel-forwarded-for': clientIp,
+      ...headers,
+    },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -187,22 +199,61 @@ describe('POST /api/subscribe', () => {
     }
   });
 
-  it('maps provider conflicts to already_subscribed', async () => {
+  it('returns the same success response for addresses already subscribed', async () => {
     const conflict = await postJson(subscribeUrl, { email: 'dupe@stub-conflict.example' });
-    expect(conflict.status).toBe(409);
-    expect(await conflict.json()).toEqual({
-      error: 'This email is already subscribed.',
-      code: 'already_subscribed',
-    });
+    expect(conflict.status).toBe(201);
+    expect(await conflict.json()).toEqual({ ok: true });
 
     const duplicateCode = await postJson(subscribeUrl, {
       email: 'dupe@stub-duplicate-code.example',
     });
-    expect(duplicateCode.status).toBe(409);
-    expect(await duplicateCode.json()).toEqual({
-      error: 'This email is already subscribed.',
-      code: 'already_subscribed',
+    expect(duplicateCode.status).toBe(201);
+    expect(await duplicateCode.json()).toEqual({ ok: true });
+  });
+
+  it('enforces the client request limit with Retry-After', async () => {
+    const headers = { 'x-vercel-forwarded-for': '198.51.100.240' };
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const response = await postJson(
+        subscribeUrl,
+        { email: `limited-${attempt}@example.com` },
+        headers,
+      );
+      expect(response.status).toBe(201);
+    }
+
+    const limited = await postJson(subscribeUrl, { email: 'beyond-limit@example.com' }, headers);
+
+    expect(limited.status).toBe(429);
+    const retryAfter = Number(limited.headers.get('retry-after'));
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(900);
+    expect(await limited.json()).toEqual({
+      error: 'Too many requests. Please try again later.',
+      code: 'rate_limited',
+      retryAfter,
     });
+  });
+
+  it('rejects unsupported content types and tags', async () => {
+    const before = (await recordedUpstreamCalls()).length;
+    const unsupportedType = await fetch(subscribeUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ email: 'reader@example.com' }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    expect(unsupportedType.status).toBe(415);
+    expect((await unsupportedType.json()).code).toBe('unsupported_media_type');
+
+    const unsupportedTag = await postJson(subscribeUrl, {
+      email: 'reader@example.com',
+      tag: 'unapproved',
+    });
+    expect(unsupportedTag.status).toBe(422);
+    expect((await unsupportedTag.json()).code).toBe('invalid_tag');
+    expect((await recordedUpstreamCalls()).length).toBe(before);
   });
 
   it('maps provider outages and network failures to 502', async () => {

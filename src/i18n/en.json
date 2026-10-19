@@ -616,7 +616,6 @@
     "successBody": "We've sent a confirmation email. Click the link inside to complete your signup.",
     "errorGeneric": "Something went wrong. Please try again.",
     "errorInvalidEmail": "Please enter a valid email address.",
-    "errorAlreadySubscribed": "This email is already subscribed.",
     "footerWidget": {
       "label": "NEWSLETTER",
       "placeholder": "your@email.com",

@@ -616,7 +616,6 @@
     "successBody": "Enviamos un correo de confirmación. Haz clic en el enlace para completar tu suscripción.",
     "errorGeneric": "Algo salió mal. Intenta de nuevo.",
     "errorInvalidEmail": "Ingresa un correo electrónico válido.",
-    "errorAlreadySubscribed": "Este correo ya está suscrito.",
     "footerWidget": {
       "label": "BOLETÍN",
       "placeholder": "tu@email.com",

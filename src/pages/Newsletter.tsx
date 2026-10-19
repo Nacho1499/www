@@ -6,13 +6,7 @@ import { track } from '../utils/track';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type FormState =
-  | 'idle'
-  | 'submitting'
-  | 'success'
-  | 'error_invalid'
-  | 'error_duplicate'
-  | 'error_generic';
+type FormState = 'idle' | 'submitting' | 'success' | 'error_invalid' | 'error_generic';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -32,8 +26,6 @@ export default function Newsletter() {
     switch (formState) {
       case 'error_invalid':
         return t('newsletter.errorInvalidEmail');
-      case 'error_duplicate':
-        return t('newsletter.errorAlreadySubscribed');
       case 'error_generic':
         return t('newsletter.errorGeneric');
       default:
@@ -63,19 +55,12 @@ export default function Newsletter() {
         body: JSON.stringify({ email: trimmed }),
       });
 
-      // 201 = subscription accepted by the backend and a double opt-in
-      // confirmation email has been queued by Buttondown. This is the successful
-      // submission conversion. (The actual email-confirmation step is handled by
-      // Buttondown's email flow, which is outside this SPA — see newsletter_confirm.)
+      // The backend returns the same success response for new and existing
+      // addresses so list membership is not disclosed.
       if (res.status === 201) {
         submittedRef.current = true;
         track('newsletter_submit', { source: 'newsletter-page' });
         setFormState('success');
-        return;
-      }
-
-      if (res.status === 409) {
-        setFormState('error_duplicate');
         return;
       }
 

@@ -116,11 +116,11 @@ describe('Newsletter page', () => {
     expect(screen.queryByRole('button', { name: /newsletter\.submit/i })).not.toBeInTheDocument();
   });
 
-  it('shows an "already subscribed" error on 409 response', async () => {
+  it('shows the same success state for an address already subscribed', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
-      ok: false,
-      status: 409,
-      json: async () => ({ error: 'already_subscribed' }),
+      ok: true,
+      status: 201,
+      json: async () => ({ ok: true }),
     } as Response);
 
     const user = userEvent.setup();
@@ -130,7 +130,7 @@ describe('Newsletter page', () => {
     await user.type(emailInput, 'existing@example.com');
     await user.click(screen.getByRole('button', { name: /newsletter\.submit/i }));
 
-    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toBeInTheDocument();
   });
 
   it('shows a generic error on 500 response', async () => {
