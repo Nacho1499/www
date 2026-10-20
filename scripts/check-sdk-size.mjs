@@ -1,9 +1,5 @@
 import { gzipSync } from 'node:zlib';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const entrypoint = fileURLToPath(import.meta.resolve('@wraith-protocol/sdk/chains/evm'));
-const generatedFile = fileURLToPath(new URL('../src/generated/sdk-size.ts', import.meta.url));
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
