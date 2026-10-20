@@ -4,6 +4,21 @@ import { fileURLToPath } from 'node:url';
 
 const entrypoint = fileURLToPath(import.meta.resolve('@wraith-protocol/sdk/chains/evm'));
 const generatedFile = fileURLToPath(new URL('../src/generated/sdk-size.ts', import.meta.url));
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const entrypoint = fileURLToPath(import.meta.resolve('@wraith-protocol/sdk/chains/evm'));
+const generatedFileArgument = process.argv.indexOf('--generated-file');
+
+if (generatedFileArgument !== -1 && !process.argv[generatedFileArgument + 1]) {
+  console.error('Missing path after --generated-file.');
+  process.exit(1);
+}
+
+const generatedFile =
+  generatedFileArgument === -1
+    ? fileURLToPath(new URL('../src/generated/sdk-size.ts', import.meta.url))
+    : resolve(process.argv[generatedFileArgument + 1]);
 const compressedBytes = gzipSync(readFileSync(entrypoint), { level: 9 }).length;
 const sizeKilobytes = (compressedBytes / 1000).toFixed(1);
 const generatedContent = `export const EVM_SDK_ESM_ENTRYPOINT_GZIP_KB = ${sizeKilobytes};\n`;

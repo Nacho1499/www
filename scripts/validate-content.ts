@@ -909,7 +909,16 @@ function validateTeam(file: string): void {
     if ('bio' in person && person['bio'] != null && !isNonEmptyString(person['bio'])) {
       fail(ctx, 'field "bio" must be a non-empty string when present');
     }
-    optionalUrl(ctx, person, 'github');
+    if (
+      'github' in person &&
+      person['github'] != null &&
+      person['github'] !== '' &&
+      !isUrl(person['github']) &&
+      (typeof person['github'] !== 'string' ||
+        !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(person['github']))
+    ) {
+      fail(ctx, 'field "github" must be a GitHub URL or username');
+    }
     optionalUrl(ctx, person, 'twitter');
   };
 

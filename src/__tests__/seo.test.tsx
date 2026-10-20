@@ -11,10 +11,14 @@
  *   and <meta name="description"> for Spanish and Portuguese
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { configure, render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import i18n from '../i18n';
 import { canonicalUrl, hreflangAlternates, SITE_ORIGIN } from '../utils/seo';
+
+// Lazy page chunks load cold on the first render; under a full parallel run
+// that can exceed Testing Library's 1s default for findBy* lookups.
+configure({ asyncUtilTimeout: 5000 });
 
 // ─── Pure utility tests ───────────────────────────────────────────────────────
 
