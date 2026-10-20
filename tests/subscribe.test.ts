@@ -1,5 +1,6 @@
 // Unit tests for the newsletter proxy. Lives outside `src` because the Vercel
 // function in `api/` is intentionally excluded from the site's tsc/Vite build.
+import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import handler, {
   BUTTONDOWN_API_URL,
@@ -55,15 +56,31 @@ function createRequest(
   headers: Record<string, string> = {},
 ): HandlerRequest {
   requestIp = (requestIp % 200) + 1;
-  return {
+  const raw = typeof body === 'string' ? body : JSON.stringify(body);
+  return createStreamRequest([raw], method, {
+    'x-vercel-forwarded-for': `198.51.100.${requestIp}`,
+    ...headers,
+  });
+}
+
+/**
+ * Builds a request whose body arrives as the given raw chunks with no
+ * Content-Length, like a chunked transfer-encoded upload.
+ */
+function createStreamRequest(
+  chunks: Iterable<string | Buffer>,
+  method = 'POST',
+  headers: Record<string, string> = {},
+): HandlerRequest {
+  const stream = Readable.from(
+    (function* () {
+      for (const chunk of chunks) yield Buffer.from(chunk);
+    })(),
+  );
+  return Object.assign(stream, {
     method,
-    headers: {
-      'content-type': 'application/json',
-      'x-vercel-forwarded-for': `198.51.100.${requestIp}`,
-      ...headers,
-    },
-    body,
-  } as unknown as HandlerRequest;
+    headers: { 'content-type': 'application/json', ...headers },
+  }) as unknown as HandlerRequest;
 }
 
 async function invoke(
@@ -165,6 +182,60 @@ describe('subscribe proxy — request validation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects chunked whitespace padding past the raw byte limit without calling the provider', async () => {
+    fetchMock.mockResolvedValue(providerResponse(201));
+    const padding = ' '.repeat(4096);
+    const payload = JSON.stringify({ email: VALID_EMAIL });
+    const response = createResponse();
+
+    await handler(
+      createStreamRequest([padding.slice(0, 2048), padding.slice(2048), payload]),
+      response as unknown as HandlerResponse,
+    );
+
+    expect(response.statusCode).toBe(413);
+    expect(response.json()).toMatchObject({ code: 'payload_too_large' });
+    expect(response.headers['connection']).toBe('close');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stops reading an unbounded chunked body once the limit is crossed', async () => {
+    let chunksPulled = 0;
+    const endless = (function* () {
+      for (;;) {
+        chunksPulled += 1;
+        yield ' '.repeat(256);
+      }
+    })();
+    const response = createResponse();
+
+    await handler(createStreamRequest(endless), response as unknown as HandlerResponse);
+
+    expect(response.statusCode).toBe(413);
+    expect(chunksPulled).toBeLessThan(64);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a whitespace-padded body that stays within the raw byte limit', async () => {
+    fetchMock.mockResolvedValue(providerResponse(201));
+    const payload = JSON.stringify({ email: VALID_EMAIL });
+    const padding = ' '.repeat(MAX_REQUEST_BODY_BYTES - payload.length);
+    const response = createResponse();
+
+    await handler(createStreamRequest([padding, payload]), response as unknown as HandlerResponse);
+
+    expect(response.statusCode).toBe(201);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a malformed JSON body with 400', async () => {
+    const response = await invoke('{ not json');
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'invalid_request' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it.each(['admin', 'newsletter,careers', 42])('rejects unsupported tags (%s)', async (tag) => {
     const response = await invoke({ email: VALID_EMAIL, tag });
 
@@ -228,6 +299,8 @@ describe('subscribe proxy — abuse protection', () => {
       'x-vercel-forwarded-for': '198.51.100.221',
     });
 
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     resolveProvider(providerResponse(201));
     const responses = await Promise.all([first, second]);

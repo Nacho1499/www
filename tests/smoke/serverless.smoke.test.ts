@@ -210,6 +210,38 @@ describe('POST /api/subscribe', () => {
     expectCommonSecurityHeaders(response, SUBSCRIBE_API_SECURITY_HEADERS);
   });
 
+  it('rejects a chunked body padded past the raw byte limit without calling the provider', async () => {
+    const before = (await recordedUpstreamCalls()).length;
+    const encoder = new TextEncoder();
+    const parts = [
+      ' '.repeat(2048),
+      ' '.repeat(2048),
+      JSON.stringify({ email: 'padded@example.com' }),
+    ];
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const part of parts) controller.enqueue(encoder.encode(part));
+        controller.close();
+      },
+    });
+
+    const response = await fetch(subscribeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-vercel-forwarded-for': '198.51.100.250',
+      },
+      body,
+      duplex: 'half',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    } as RequestInit & { duplex: 'half' });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: 'payload_too_large' });
+    expectCommonSecurityHeaders(response, SUBSCRIBE_API_SECURITY_HEADERS);
+    expect((await recordedUpstreamCalls()).length).toBe(before);
+  });
+
   it('answers 405 for non-POST methods', async () => {
     for (const method of ['GET', 'PUT', 'DELETE']) {
       const response = await fetch(subscribeUrl, { method });

@@ -37,11 +37,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  PAGE_SECURITY_HEADERS,
-  SUBSCRIBE_API_SECURITY_HEADERS,
-  resolveStaticRouteHeaders,
-} from '../src/utils/security-headers.ts';
+import { PAGE_SECURITY_HEADERS, resolveStaticRouteHeaders } from '../src/utils/security-headers.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
@@ -237,29 +233,9 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
 
 // ─── /api/subscribe ─────────────────────────────────────────────────────────
 
-async function readRequestBody(req: IncomingMessage): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(chunk as Buffer);
-  }
-  return Buffer.concat(chunks).toString('utf8');
-}
-
 async function handleSubscribe(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const raw = await readRequestBody(req);
-  if (raw.length > 0) {
-    try {
-      // Vercel parses JSON request bodies before invoking the function.
-      (req as IncomingMessage & { body?: unknown }).body = JSON.parse(raw);
-    } catch {
-      res.statusCode = 400;
-      applyHeaders(res, SUBSCRIBE_API_SECURITY_HEADERS);
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
-      return;
-    }
-  }
-
+  // The handler reads and size-limits the raw stream itself, so the request is
+  // passed through unread. Pre-buffering here would hide the limit from tests.
   const { default: subscribe } = await import('../api/subscribe.ts');
   await subscribe(req as Parameters<typeof subscribe>[0], res);
 }

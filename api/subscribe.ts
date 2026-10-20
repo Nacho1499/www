@@ -20,7 +20,7 @@ import { SUBSCRIBE_API_SECURITY_HEADERS } from '../src/utils/security-headers';
  */
 
 type SubscribeBody = { email?: unknown; tag?: unknown };
-type SubscribeRequest = IncomingMessage & { body?: unknown };
+type SubscribeRequest = IncomingMessage;
 
 const SUPPORTED_TAGS = new Set(['newsletter', 'careers']);
 export const MAX_REQUEST_BODY_BYTES = 2048;
@@ -160,6 +160,52 @@ function isSubscribeBody(value: unknown): value is SubscribeBody {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+type RawBodyResult = { kind: 'ok'; text: string } | { kind: 'too_large' } | { kind: 'error' };
+
+/**
+ * Reads the raw request bytes and stops as soon as `limit` is crossed, before
+ * any JSON parsing happens. Counting raw bytes covers whitespace padding and
+ * chunked transfer encoding, which a post-parse size check cannot see.
+ * `req.body` is deliberately never touched: on Vercel it is a lazy getter that
+ * would buffer and parse the whole stream first.
+ */
+function readRawBody(req: SubscribeRequest, limit: number): Promise<RawBodyResult> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    let settled = false;
+
+    const finish = (result: RawBodyResult) => {
+      if (settled) return;
+      settled = true;
+      req.off('data', onData);
+      req.off('end', onEnd);
+      req.off('error', onError);
+      req.off('aborted', onError);
+      resolve(result);
+    };
+
+    const onData = (chunk: Buffer | string) => {
+      const buffer = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+      received += buffer.byteLength;
+      if (received > limit) {
+        chunks.length = 0;
+        req.pause();
+        finish({ kind: 'too_large' });
+        return;
+      }
+      chunks.push(buffer);
+    };
+    const onEnd = () => finish({ kind: 'ok', text: Buffer.concat(chunks).toString('utf8') });
+    const onError = () => finish({ kind: 'error' });
+
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('error', onError);
+    req.on('aborted', onError);
+  });
+}
+
 async function submitToProvider(
   rawEmail: string,
   tag: string,
@@ -270,22 +316,29 @@ export default async function handler(req: SubscribeRequest, res: ServerResponse
     return;
   }
 
-  let serializedBody: string | undefined;
+  const rawBody = await readRawBody(req, MAX_REQUEST_BODY_BYTES);
+  if (rawBody.kind === 'too_large') {
+    logEvent(requestId, 'payload_too_large', 413);
+    res.setHeader('Connection', 'close');
+    sendError(res, requestId, 'payload_too_large');
+    return;
+  }
+  if (rawBody.kind === 'error') {
+    logEvent(requestId, 'invalid_request', 400);
+    sendError(res, requestId, 'invalid_request');
+    return;
+  }
+
+  let parsedBody: unknown;
   try {
-    serializedBody = JSON.stringify(req.body);
+    parsedBody = JSON.parse(rawBody.text);
   } catch {
     logEvent(requestId, 'invalid_request', 400);
     sendError(res, requestId, 'invalid_request');
     return;
   }
 
-  if (Buffer.byteLength(serializedBody ?? '', 'utf8') > MAX_REQUEST_BODY_BYTES) {
-    logEvent(requestId, 'payload_too_large', 413);
-    sendError(res, requestId, 'payload_too_large');
-    return;
-  }
-
-  const body = isSubscribeBody(req.body) ? req.body : {};
+  const body = isSubscribeBody(parsedBody) ? parsedBody : {};
   const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const tag =
     body.tag === undefined ? 'newsletter' : typeof body.tag === 'string' ? body.tag.trim() : '';
