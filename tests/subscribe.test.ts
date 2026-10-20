@@ -312,6 +312,40 @@ describe('subscribe proxy — abuse protection', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not collapse concurrent submissions for the same email with different tags', async () => {
+    const resolvers: Array<(response: Response) => void> = [];
+    fetchMock.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const newsletter = invoke(
+      { email: ' User@Example.com ', tag: 'newsletter' },
+      'POST',
+      createResponse(),
+      { 'x-vercel-forwarded-for': '198.51.100.222' },
+    );
+    const careers = invoke({ email: VALID_EMAIL, tag: 'careers' }, 'POST', createResponse(), {
+      'x-vercel-forwarded-for': '198.51.100.223',
+    });
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    for (const resolve of resolvers) resolve(providerResponse(201));
+    const responses = await Promise.all([newsletter, careers]);
+
+    expect(responses.map(({ statusCode }) => statusCode)).toEqual([201, 201]);
+    const forwarded = fetchMock.mock.calls.map(([, init]) => JSON.parse(init?.body as string));
+    expect(forwarded).toEqual(
+      expect.arrayContaining([
+        { email: VALID_EMAIL, tags: ['newsletter'], type: 'unconfirmed' },
+        { email: VALID_EMAIL, tags: ['careers'], type: 'unconfirmed' },
+      ]),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('rate limits by the trusted Vercel IP and returns stable retry information', async () => {
     fetchMock.mockResolvedValue(providerResponse(201));
     const trustedIp = '198.51.100.230';

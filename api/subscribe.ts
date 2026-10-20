@@ -367,13 +367,17 @@ export default async function handler(req: SubscribeRequest, res: ServerResponse
     return;
   }
 
-  let submission = inFlightSubmissions.get(rawEmail);
+  // Deduplicate on email plus tag: concurrent requests for the same address
+  // with different tags are distinct intents and must each reach the provider.
+  // The email regex rejects whitespace, so a newline separator cannot collide.
+  const submissionKey = `${rawEmail}\n${tag}`;
+  let submission = inFlightSubmissions.get(submissionKey);
   if (!submission) {
     submission = submitToProvider(rawEmail, tag, apiKey, requestId);
-    inFlightSubmissions.set(rawEmail, submission);
+    inFlightSubmissions.set(submissionKey, submission);
     const clearSubmission = () => {
-      if (inFlightSubmissions.get(rawEmail) === submission) {
-        inFlightSubmissions.delete(rawEmail);
+      if (inFlightSubmissions.get(submissionKey) === submission) {
+        inFlightSubmissions.delete(submissionKey);
       }
     };
     void submission.then(clearSubmission, clearSubmission);
