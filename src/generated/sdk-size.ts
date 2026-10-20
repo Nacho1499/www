@@ -1,0 +1,1 @@
+export const EVM_SDK_ESM_ENTRYPOINT_GZIP_KB = 4.0;
